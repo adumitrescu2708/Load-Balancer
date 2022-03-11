@@ -1,0 +1,142 @@
+Copyright 2021 Dumitrescu Alexandra
+NUME: Dumitrescu Alexandra
+GRUPA: 313CA
+
+Load Balancer
+
+		Tema #2 - Structuri de Date
+
+-- IMPLEMENTAREA STRUCTURII DE DATE
+
+Fiecare server este retinut in memorie printr-un hashtable si o eticheta
+(in cazul nostru, un camp ID). Load Balancer-ul cuprinde un vector implementat
+dinamic, pentru a putea fi redimensionat, de pointeri la serverele din
+sistemul propus, un vector circular de etichete (***), adica hashring-ul(*)
+si un contor menit sa retina cate servere avem introduse in sistem. (**)
+	
+	(*) Hashring -- este construit si pastrat in mod constant sortat
+	crescator pentru a eficientiza cautarea unei informatii din sistem,
+	folosind functia de cautare binara.
+
+	(**) servers_count  -- este un camp care retine cate etichete avem
+	introduse in hashring. In intregul program se merge pe principiul ca
+	pentru un singur server, se introduc 3 intrari in hashring (vezi (***)).
+	Astfel, este simplu sa deducem numarul de servere din sistem -->
+	servers_count/3
+
+	(***) etichete -- 
+
+		EXEMPLU:
+
+		Date retinute 				Date retinute
+			in server_memory:			in hashring:
+
+
+					--->			ETICHETA #1: 100000 * 0 + 1
+		(ID: 1)		--->			ETICHETA #2: 100000 * 1 + 1
+					--->			ETICHETA #3: 100000 * 2 + 1
+
+									Toate cele 3 etichete fac referire
+									la serverul identificat prin:
+
+									ID = ETICHETA #N % 100000
+
+Vezi si: server.h, antet load_balancer.c
+
+-- LOAD BALANCER
+------- Functia de CREATE:
+	| load_balancer* init_load_balancer()
+Returneaza o structura de tip load_balancer, careia i-au fost
+alocate si initializate campurile.
+
+
+------- Functia de ADD SERVER:
+Pentru a adauga un server in sistem se fac 2 operatii:
+
+(1): Se modifica: -- vectorul de pointeri la serverele din sistem.
+Se redimensioneaza vectorul, iar pe ultima pozitie se adauga si
+initializeaza un nou server, ID-ul fiind cel primit ca parametru
+
+(2): Se modifica: -- hashringul.
+Pentru a pastra proprietatea de vector sortat crescator si circular se
+aplica functia de cautare binara pentru a afla pozitia corecta pe care trebuie
+adaugata eticheta. Se redimensioneaza vectorul si se aplica o shiftare la
+dreapta incepand cu pozitia descoperita anterior pentru a fi introdusa
+noua eticheta.
+Operatia se repeta de 3 ori (vezi: (***)). De fiecare data, se verifica
+prin functia de check_objects() daca trebuie mutate obiectele in alt server.
+(a)
+EXEMPLU right_shift():
+	Se urmareste adaugarea etichetei 2002 pe pozitia 2:
+
+	hashring (inainte): 1000 2000 3000 4000
+	hashring (dupa #1): 1000 2000 2000 3000 4000 -->
+		-->	 (dupa #2): 1000 2000 2002 3000 4000
+
+O data adaugat un server in sistem apare conditia (a).
+Se studiaza daca obiectele din serverul vecin urmator trebuie mutate in
+serverul nou introdus.
+
+
+------- Functia de REMOVE SERVER:
+Pentru a elimina un server din sistem se fac 2 operatii:
+
+(1): Se modifica: --hashringul.
+Se redimensioneaza vectorul si se elimina toate etichetele aferente ID-ului
+serverului pe care vrem sa il stergem. (vezi (***)).
+O eticheta este stearsa din hashring printr-o shiftare la stanga a
+vectorului:
+
+EXEMPLU left_shift():
+	Se urmareste eliminarea etichetei 2002 de pe pozitia 2:
+
+ 	hashring (inainte): 1000 2000 2002 3000 4000
+ 	hashring (dupa #1): 1000 2000 3000 4000 4000 -->
+ 		-->  (dupa #2): 1000 2000 3000 4000
+
+
+(2): Se modifica: --vectorul de servere
+Stiind ID-ul serverului pe care dorim sa il stergem aplicam functia de search
+pentru a gasi pointerul catre serverul respectiv. Se redistribuie obiectele
+din hashtableul serverului gasit anterior. Se redimensioneaza vectorul de
+servere si se aplica o shiftare la stanga.
+
+
+------- Functia de RETRIEVE:
+Prin cautare binara, gasim pozitia in hashring unde se afla eticheta
+serverului care stocheaza obiectul. O data cunoscuta eticheta, cunoastem si
+ID-ul serverului. Se aplica functia de search_server pentru ID-ul identificat
+Astfel, obtinem serverul si se apeleaza functia (A)
+
+
+
+------- Functia de STORE:
+IDEM functiei de retrieve se gaseste serverul unde vom stoca noul obiect.
+Se apeleaza functia (B).
+
+
+
+------- Functia de DESTROY:
+Elibereaza memoria ocupata de fiecare server prin (C), de hashring, de
+vectorul de servere si, in final, de load balancer.
+
+
+-- SERVER_MEMORY
+------- Functia de INIT:
+Returneaza un pointer la o variabila server_memory, careia i-au fost
+alocate si initializate campurile.
+
+------- Functia de STORE: (B)
+Introduce o noua pereche cheie-valoare in hashtableul asociat serverului.
+Se verifica existenta cheii primite, caz in care se face update valorii.
+In caz contrar, se ia un auxiliar in care se retin cheia si valoarea, urmand
+sa fie adaugate la finalul listei (bucketului).
+
+------- Functia de REMOVE:  (C)
+Sterge cheia din hashtableul trimis ca parametru.
+
+------- Functia de RETRIEVE:  (A)
+Returneaza valoarea asociata cheii primite ca parametru.
+
+------- Functia de FREE:
+Elibereaza memoria ocupata de serverul primit ca parametru.
